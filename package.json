@@ -1,0 +1,25 @@
+{
+  "name": "generate-haproxy",
+  "description": "generate haproxy config file",
+  "version": "0.1.1",
+  "author": {
+    "name": "vicanso 小墨鱼",
+    "email": "vicansocanbico@gmail.com"
+  },
+  "keywords": [
+    "express,base"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vicanso/generate-haproxy.git"
+  },
+  "main": "app",
+  "README": "generate haproxy config",
+  "dependencies": {
+    "co": "^4.5.4",
+    "lodash": "^3.8.0",
+    "node-etcd": "^4.0.2"
+  },
+  "devDependencies": {}
+}
