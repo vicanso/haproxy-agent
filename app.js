@@ -4,19 +4,19 @@ var fs = require('fs');
 var path = require('path');
 var util = require('util');
 var url = require('url');
-var Etcd = require('node-etcd');
 var crypto = require('crypto');
 var spawn = require('child_process').spawn;
 var varnishKey = 'varnish';
 var etcdServer = process.env.ETCD || 'etcd://127.0.0.1:4001';
 var urlInfo = url.parse(etcdServer);
-var etcd = new Etcd(urlInfo.hostname, urlInfo.port);
+var request = require('superagent');
 
 
 
 var currentHaproxyConfig = '';
 var checkInterval = 60 * 1000;
 setTimeout(createHaproxyConfig, checkInterval);
+createHaproxyConfig();
 /**
  * [createHaproxyConfig description]
  * @return {[type]}
@@ -27,7 +27,7 @@ function createHaproxyConfig(){
     if(serverList.length){
       var arr = [];
       _.forEach(serverList, function(server, i){
-        arr.push(util.format('  server varnish%d %s:%s check inter 5000 rise 3 fail 3 weight 1', i, server.ip, server.port));
+        arr.push(util.format('  server %s %s:%s check inter 3000 weight 1', server.name, server.ip, server.port));
       });
       var tpl = yield function(done){
         var file = path.join(__dirname, './template/haproxy.tpl');
@@ -60,15 +60,21 @@ function createHaproxyConfig(){
  */
 function *getServers(){
   var result = yield function(done){
-    etcd.get(varnishKey, done);
+    var etcUrl = util.format('http://%s:%s/v2/keys/%s', urlInfo.hostname, urlInfo.port, varnishKey)
+    request.get(etcUrl).end(done)
   };
-  var nodes = _.get(result, '[0].node.nodes');
+  var nodes = _.get(result, 'body.node.nodes');
   var list = [];
   _.forEach(nodes, function(node){
     list.push(node.value);
   });
-  var backendList = _.map(_.uniq(list), function(v){
-    return JSON.parse(v)
-  })
+  var backendList = [];
+  _.forEach(_.uniq(list), function(v){
+    try{
+      backendList.push(JSON.parse(v));
+    }catch(err){
+      console.error(err);
+    }
+  });
   return backendList;
 }

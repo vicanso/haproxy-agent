@@ -1,7 +1,7 @@
 {
   "name": "generate-haproxy",
   "description": "generate haproxy config file",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "author": {
     "name": "vicanso 小墨鱼",
     "email": "vicansocanbico@gmail.com"
@@ -19,7 +19,7 @@
   "dependencies": {
     "co": "^4.5.4",
     "lodash": "^3.8.0",
-    "node-etcd": "^4.0.2"
+    "superagent": "^1.2.0"
   },
   "devDependencies": {}
 }

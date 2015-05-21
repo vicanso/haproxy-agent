@@ -1,8 +1,7 @@
 ###全局配置信息###
 ###参数是进程级的，通常和操作系统（OS）相关###
 global
-  log /dev/log  local0
-  log /dev/log  local1 notice
+  log 127.0.0.1:514 local0 notice 
   chroot /var/lib/haproxy
   stats socket /run/haproxy/admin.sock mode 660 level admin
   stats timeout 30s
@@ -25,7 +24,7 @@ defaults
   timeout connect 10000                 #连接超时
   timeout client 30000                #客户端超时
   timeout server 30000                #服务器超时
-  timeout check 5000              #心跳检测超时
+  timeout check 3000              #心跳检测超时
 
 
 ###frontend配置###
