@@ -15,7 +15,7 @@
     "url": "https://github.com/vicanso/generate-haproxy.git"
   },
   "main": "app",
-  "README": "generate haproxy config",
+  "readmeFilename": "README.md",
   "dependencies": {
     "co": "^4.5.4",
     "lodash": "^3.8.0",
