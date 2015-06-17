@@ -34,7 +34,8 @@ function createHaproxyConfig(){
       var template = _.template(tpl);
       var cfg = template({
         updatedAt : getDate(),
-        serverList : arr.join('\n')
+        serverList : arr.join('\n'),
+        hostname : process.env.HOSTNAME || 'unknown'
       });
       var result = fs.writeFileSync('/etc/haproxy/haproxy.cfg', cfg);
       if(!result){
