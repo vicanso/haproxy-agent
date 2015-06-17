@@ -10,10 +10,7 @@ var varnishKey = 'varnish';
 var etcdServer = process.env.ETCD || 'etcd://127.0.0.1:4001';
 var urlInfo = url.parse(etcdServer);
 var request = require('superagent');
-
-
-
-var currentHaproxyConfig = '';
+var currentHaproxyCfgHash = '';
 var checkInterval = 60 * 1000;
 setTimeout(createHaproxyConfig, checkInterval);
 createHaproxyConfig();
@@ -24,7 +21,8 @@ createHaproxyConfig();
 function createHaproxyConfig(){
   co(function *(){
     var serverList = yield getServers();
-    if(serverList.length){
+    var hash = getHash(serverList);
+    if(serverList.length && currentHaproxyCfgHash !== hash){
       var arr = [];
       _.forEach(serverList, function(server, i){
         arr.push(util.format('  server %s %s:%s check inter 3000 weight 1', server.name, server.ip, server.port));
@@ -35,14 +33,16 @@ function createHaproxyConfig(){
       };
       var template = _.template(tpl);
       var cfg = template({
+        updatedAt : getDate(),
         serverList : arr.join('\n')
       });
       var result = fs.writeFileSync('/etc/haproxy/haproxy.cfg', cfg);
       if(!result){
-        currentHaproxyConfig = cfg;
         var cmd = spawn('service', ['haproxy', 'reload']);
-        cmd.on('error', function(err){
-          console.error(err);
+        cmd.on('close', function(code){
+          if(code === 0){
+            currentHaproxyCfgHash = hash;
+          }
         });
       }
     }
@@ -76,5 +76,50 @@ function *getServers(){
       console.error(err);
     }
   });
+  backendList = _.sortBy(backendList, function(item){
+    return item.ip + item.port + item.name;
+  });
   return backendList;
+}
+
+/**
+ * [getHash description]
+ * @param  {[type]} servers [description]
+ * @return {[type]}         [description]
+ */
+function getHash(servers){
+  var str = JSON.stringify(servers);
+  var shasum = crypto.createHash('sha1');
+  shasum.update(str);
+  return shasum.digest('hex');
+}
+
+
+/**
+ * [getDate 获取日期字符串，用于生成版本号]
+ * @return {[type]} [description]
+ */
+function getDate(){
+  var date = new Date();
+  var month = date.getMonth() + 1;
+  if(month < 10){
+    month = '0' + month;
+  }
+  var day = date.getDate();
+  if(day < 10){
+    day = '0' + day;
+  }
+  var hours = date.getHours();
+  if(hours < 10){
+    hours = '0' + hours;
+  }
+  var minutes = date.getMinutes();
+  if(minutes < 10){
+    minutes = '0' + minutes;
+  }
+  var seconds = date.getSeconds();
+  if(seconds < 10){
+    seconds = '0' + seconds;
+  }
+  return '' + date.getFullYear() + '-' + month + '-' + day + 'T' + hours + ':' + minutes + ':' + seconds; 
 }

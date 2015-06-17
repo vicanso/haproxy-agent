@@ -1,3 +1,4 @@
+#更新时间：<%= updatedAt %>
 ###全局配置信息###
 ###参数是进程级的，通常和操作系统（OS）相关###
 global
@@ -50,4 +51,5 @@ backend varnish
   #心跳检测
   option httpchk GET /ping
   balance uri whole
+  hash-type consistent
 <%= serverList %>
