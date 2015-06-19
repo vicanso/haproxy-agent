@@ -6,19 +6,29 @@ var util = require('util');
 var url = require('url');
 var crypto = require('crypto');
 var spawn = require('child_process').spawn;
-var varnishKey = 'varnish';
-var etcdServer = process.env.ETCD || 'etcd://127.0.0.1:4001';
-var urlInfo = url.parse(etcdServer);
 var request = require('superagent');
-var currentHaproxyCfgHash = '';
-var checkInterval = 60 * 1000;
-setTimeout(createHaproxyConfig, checkInterval);
-createHaproxyConfig();
+if(!validateEnv()){
+  return;
+}
+
+setTimeout(function(){
+  createHaproxyConfig();
+}, 1000);
 /**
  * [createHaproxyConfig description]
  * @return {[type]}
  */
-function createHaproxyConfig(){
+function createHaproxyConfig(currentHaproxyCfgHash){
+  var timer;
+  var finished = function(){
+    if(timer){
+      clearTimeout(timer);
+    }
+    timer = setTimeout(function(){
+      timer = 0;
+      createHaproxyConfig(currentHaproxyCfgHash);
+    }, 60 * 1000);
+  };
   co(function *(){
     var serverList = yield getServers();
     var hash = getHash(serverList);
@@ -35,7 +45,7 @@ function createHaproxyConfig(){
       var cfg = template({
         updatedAt : getDate(),
         serverList : arr.join('\n'),
-        hostname : process.env.HOSTNAME || 'unknown'
+        name : process.env.NAME
       });
       var result = fs.writeFileSync('/etc/haproxy/haproxy.cfg', cfg);
       if(!result){
@@ -45,12 +55,15 @@ function createHaproxyConfig(){
             currentHaproxyCfgHash = hash;
           }
         });
+        cmd.on('error', function(err){
+          console.error(err);
+        });
       }
     }
-    setTimeout(createHaproxyConfig, checkInterval);
+    finished();
   }).catch(function(err){
     console.error(err);
-    setTimeout(createHaproxyConfig, checkInterval);
+    finished();
   });
 }
 
@@ -61,7 +74,9 @@ function createHaproxyConfig(){
  */
 function *getServers(){
   var result = yield function(done){
-    var etcUrl = util.format('http://%s:%s/v2/keys/%s', urlInfo.hostname, urlInfo.port, varnishKey)
+    var key = process.env.VARNISH_KEY;
+    var urlInfo = getEtcd();
+    var etcUrl = util.format('http://%s:%s/v2/keys/%s', urlInfo.hostname, urlInfo.port, key)
     request.get(etcUrl).end(done)
   };
   var nodes = _.get(result, 'body.node.nodes');
@@ -123,4 +138,30 @@ function getDate(){
     seconds = '0' + seconds;
   }
   return '' + date.getFullYear() + '-' + month + '-' + day + 'T' + hours + ':' + minutes + ':' + seconds; 
+}
+
+
+/**
+ * [validateEnv 校验env的合法性]
+ * @return {[type]} [description]
+ */
+function validateEnv(){
+  var env = process.env;
+  var keys = 'ETCD NAME VARNISH_KEY'.split(' ');
+  var fail = false;
+  _.forEach(keys, function(key){
+    if(!env[key]){
+      fail = true;
+    }
+  });
+  if(fail){
+    console.error('参数：' + keys.join(',') + '均不能为空！');
+    return false;
+  }
+  return true;
+}
+
+
+function getEtcd(){
+  return url.parse(process.env.ETCD);
 }

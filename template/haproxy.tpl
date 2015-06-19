@@ -41,7 +41,7 @@ frontend 80port
   # log the User-Agent
   capture request header User-Agent len 200
 
-  http-request add-header X-Process HA-<%= hostname %>
+  http-request add-header X-Process <%= name %>
 
   #默认backend
   default_backend varnish
