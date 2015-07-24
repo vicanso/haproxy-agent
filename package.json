@@ -1,7 +1,7 @@
 {
-  "name": "generate-haproxy",
-  "description": "generate haproxy config file",
-  "version": "0.2.3",
+  "name": "haproxy-agent",
+  "description": "get backend config from etcd and the generate haproxy config file",
+  "version": "0.0.1",
   "author": {
     "name": "vicanso 小墨鱼",
     "email": "vicansocanbico@gmail.com"
@@ -12,14 +12,15 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/vicanso/generate-haproxy.git"
+    "url": "https://github.com/vicanso/haproxy-agent.git"
   },
   "main": "app",
   "readmeFilename": "README.md",
   "dependencies": {
-    "co": "^4.5.4",
-    "lodash": "^3.8.0",
-    "superagent": "^1.2.0"
+    "co": "^4.6.0",
+    "lodash": "^3.10.0",
+    "superagent": "^1.2.0",
+    "url-join": "0.0.1"
   },
   "devDependencies": {}
 }

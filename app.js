@@ -1,15 +1,15 @@
-var _ = require('lodash');
-var co = require('co');
-var fs = require('fs');
-var path = require('path');
-var util = require('util');
-var url = require('url');
-var crypto = require('crypto');
-var spawn = require('child_process').spawn;
-var request = require('superagent');
-if(!validateEnv()){
-  return;
-}
+'use strict';
+const _ = require('lodash');
+const co = require('co');
+const fs = require('fs');
+const etcd = require('./lib/etcd');
+const path = require('path');
+const util = require('util');
+const url = require('url');
+const crypto = require('crypto');
+const spawn = require('child_process').spawn;
+etcd.url = process.env.ETCD || 'http://localhost:4001';
+const etcdKey = process.env.BACKEND_KEY || 'haproxy-backends';
 
 setTimeout(function(){
   createHaproxyConfig();
@@ -19,9 +19,9 @@ setTimeout(function(){
  * @return {[type]}
  */
 function createHaproxyConfig(currentHaproxyCfgHash){
-  var timer;
-  var finished = function(){
-    if(timer){
+  let timer;
+  let finished = function(){
+    if (timer) {
       clearTimeout(timer);
     }
     timer = setTimeout(function(){
@@ -30,26 +30,26 @@ function createHaproxyConfig(currentHaproxyCfgHash){
     }, 60 * 1000);
   };
   co(function *(){
-    var serverList = yield getServers();
-    var hash = getHash(serverList);
+    let serverList = yield getServers(etcdKey);
+    let hash = getHash(serverList);
     if(serverList.length && currentHaproxyCfgHash !== hash){
-      var arr = [];
+      let arr = [];
       _.forEach(serverList, function(server, i){
         arr.push(util.format('  server %s %s:%s check inter 3000 weight 1', server.name, server.ip, server.port));
       });
-      var tpl = yield function(done){
-        var file = path.join(__dirname, './template/haproxy.tpl');
+      let tpl = yield function(done){
+        let file = path.join(__dirname, './template/haproxy.tpl');
         fs.readFile(file, 'utf8', done);
       };
-      var template = _.template(tpl);
-      var cfg = template({
+      let template = _.template(tpl);
+      let cfg = template({
         updatedAt : getDate(),
         serverList : arr.join('\n'),
         name : process.env.NAME
       });
-      var result = fs.writeFileSync('/etc/haproxy/haproxy.cfg', cfg);
+      let result = fs.writeFileSync('/etc/haproxy/haproxy.cfg', cfg);
       if(!result){
-        var cmd = spawn('service', ['haproxy', 'reload']);
+        let cmd = spawn('service', ['haproxy', 'reload']);
         cmd.on('close', function(code){
           if(code === 0){
             currentHaproxyCfgHash = hash;
@@ -69,22 +69,17 @@ function createHaproxyConfig(currentHaproxyCfgHash){
 
 /**
  * [getServers 获取服务器列表]
- * @param  {[type]} serverList [description]
- * @return {[type]}            [description]
+ * @param  {[type]} key [description]
+ * @return {[type]}     [description]
  */
-function *getServers(){
-  var result = yield function(done){
-    var key = process.env.VARNISH_KEY;
-    var urlInfo = getEtcd();
-    var etcUrl = util.format('http://%s:%s/v2/keys/%s', urlInfo.hostname, urlInfo.port, key)
-    request.get(etcUrl).end(done)
-  };
-  var nodes = _.get(result, 'body.node.nodes');
-  var list = [];
+function *getServers(key){
+  let result = yield etcd.get(etcdKey);
+  let nodes = result.nodes;
+  let list = [];
   _.forEach(nodes, function(node){
     list.push(node.value);
   });
-  var backendList = [];
+  let backendList = [];
   _.forEach(_.uniq(list), function(v){
     try{
       backendList.push(JSON.parse(v));
@@ -104,8 +99,8 @@ function *getServers(){
  * @return {[type]}         [description]
  */
 function getHash(servers){
-  var str = JSON.stringify(servers);
-  var shasum = crypto.createHash('sha1');
+  let str = JSON.stringify(servers);
+  let shasum = crypto.createHash('sha1');
   shasum.update(str);
   return shasum.digest('hex');
 }
@@ -116,52 +111,26 @@ function getHash(servers){
  * @return {[type]} [description]
  */
 function getDate(){
-  var date = new Date();
-  var month = date.getMonth() + 1;
+  let date = new Date();
+  let month = date.getMonth() + 1;
   if(month < 10){
     month = '0' + month;
   }
-  var day = date.getDate();
+  let day = date.getDate();
   if(day < 10){
     day = '0' + day;
   }
-  var hours = date.getHours();
+  let hours = date.getHours();
   if(hours < 10){
     hours = '0' + hours;
   }
-  var minutes = date.getMinutes();
+  let minutes = date.getMinutes();
   if(minutes < 10){
     minutes = '0' + minutes;
   }
-  var seconds = date.getSeconds();
+  let seconds = date.getSeconds();
   if(seconds < 10){
     seconds = '0' + seconds;
   }
-  return '' + date.getFullYear() + '-' + month + '-' + day + 'T' + hours + ':' + minutes + ':' + seconds; 
-}
-
-
-/**
- * [validateEnv 校验env的合法性]
- * @return {[type]} [description]
- */
-function validateEnv(){
-  var env = process.env;
-  var keys = 'ETCD NAME VARNISH_KEY'.split(' ');
-  var fail = false;
-  _.forEach(keys, function(key){
-    if(!env[key]){
-      fail = true;
-    }
-  });
-  if(fail){
-    console.error('参数：' + keys.join(',') + '均不能为空！');
-    return false;
-  }
-  return true;
-}
-
-
-function getEtcd(){
-  return url.parse(process.env.ETCD);
+  return '' + date.getFullYear() + '-' + month + '-' + day + 'T' + hours + ':' + minutes + ':' + seconds;
 }
