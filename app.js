@@ -35,7 +35,8 @@ function createHaproxyConfig(currentHaproxyCfgHash){
     if(serverList.length && currentHaproxyCfgHash !== hash){
       let arr = [];
       _.forEach(serverList, function(server, i){
-        arr.push(util.format('  server %s %s:%s check inter 3000 weight 1', server.name, server.ip, server.port));
+        let weight = server.weight || 1;
+        arr.push(util.format('  server %s %s:%s check inter 3000 weight %d', server.name, server.ip, server.port, weight));
       });
       let tpl = yield function(done){
         let file = path.join(__dirname, './template/haproxy.tpl');
@@ -45,7 +46,7 @@ function createHaproxyConfig(currentHaproxyCfgHash){
       let cfg = template({
         updatedAt : getDate(),
         serverList : arr.join('\n'),
-        name : process.env.NAME
+        name : process.env.NAME || 'unknow'
       });
       let result = fs.writeFileSync('/etc/haproxy/haproxy.cfg', cfg);
       if(!result){
