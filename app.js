@@ -38,10 +38,8 @@ function createHaproxyConfig(currentHaproxyCfgHash){
         let weight = server.weight || 1;
         arr.push(util.format('  server %s %s:%s check inter 3000 weight %d', server.name, server.ip, server.port, weight));
       });
-      let tpl = yield function(done){
-        let file = path.join(__dirname, './template/haproxy.tpl');
-        fs.readFile(file, 'utf8', done);
-      };
+      let file = path.join(__dirname, './template/haproxy.tpl');
+      let tpl = fs.readFileSync(file, 'utf8');
       let template = _.template(tpl);
       let cfg = template({
         updatedAt : getDate(),
