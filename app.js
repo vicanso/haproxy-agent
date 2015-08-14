@@ -2,15 +2,13 @@
 const _ = require('lodash');
 const co = require('co');
 const fs = require('fs');
-const etcd = require('./lib/etcd');
 const path = require('path');
 const util = require('util');
 const url = require('url');
 const crypto = require('crypto');
 const spawn = require('child_process').spawn;
-etcd.url = process.env.ETCD || 'http://localhost:4001';
-const etcdKey = process.env.BACKEND_KEY || 'haproxy-backends';
-
+const consul = require('./lib/consul');
+var registered = false;
 setTimeout(function(){
   createHaproxyConfig();
 }, 1000);
@@ -30,7 +28,7 @@ function createHaproxyConfig(currentHaproxyCfgHash){
     }, 60 * 1000);
   };
   co(function *(){
-    let serverList = yield getServers(etcdKey);
+    let serverList = yield getServers();
     let hash = getHash(serverList);
     if(serverList.length && currentHaproxyCfgHash !== hash){
       let arr = [];
@@ -42,9 +40,9 @@ function createHaproxyConfig(currentHaproxyCfgHash){
       let tpl = fs.readFileSync(file, 'utf8');
       let template = _.template(tpl);
       let cfg = template({
-        updatedAt : getDate(),
+        updatedAt : (new Date()).toISOString(),
         serverList : arr.join('\n'),
-        name : process.env.NAME || 'unknow'
+        name : process.env.HOSTNAME || 'unknow'
       });
       let result = fs.writeFileSync('/etc/haproxy/haproxy.cfg', cfg);
       if(!result){
@@ -52,6 +50,13 @@ function createHaproxyConfig(currentHaproxyCfgHash){
         cmd.on('close', function(code){
           if(code === 0){
             currentHaproxyCfgHash = hash;
+            console.info('restart haproxy successful at:%s', new Date());
+            if (!registered) {
+              co(function *() {
+                yield consul.register();
+                registered = true;
+              });
+            }
           }
         });
         cmd.on('error', function(err){
@@ -61,31 +66,18 @@ function createHaproxyConfig(currentHaproxyCfgHash){
     }
     finished();
   }).catch(function(err){
-    console.error(err);
+    console.error('message:' + err.message);
+    console.error('stack:' + err.stack);
     finished();
   });
 }
 
 /**
  * [getServers 获取服务器列表]
- * @param  {[type]} key [description]
  * @return {[type]}     [description]
  */
-function *getServers(key){
-  let result = yield etcd.get(etcdKey);
-  let nodes = result.nodes;
-  let list = [];
-  _.forEach(nodes, function(node){
-    list.push(node.value);
-  });
-  let backendList = [];
-  _.forEach(_.uniq(list), function(v){
-    try{
-      backendList.push(JSON.parse(v));
-    }catch(err){
-      console.error(err);
-    }
-  });
+function *getServers(){
+  let backendList = yield consul.getHttpBackends();
   backendList = _.sortBy(backendList, function(item){
     return item.ip + item.port + item.name;
   });
@@ -102,34 +94,4 @@ function getHash(servers){
   let shasum = crypto.createHash('sha1');
   shasum.update(str);
   return shasum.digest('hex');
-}
-
-
-/**
- * [getDate 获取日期字符串，用于生成版本号]
- * @return {[type]} [description]
- */
-function getDate(){
-  let date = new Date();
-  let month = date.getMonth() + 1;
-  if(month < 10){
-    month = '0' + month;
-  }
-  let day = date.getDate();
-  if(day < 10){
-    day = '0' + day;
-  }
-  let hours = date.getHours();
-  if(hours < 10){
-    hours = '0' + hours;
-  }
-  let minutes = date.getMinutes();
-  if(minutes < 10){
-    minutes = '0' + minutes;
-  }
-  let seconds = date.getSeconds();
-  if(seconds < 10){
-    seconds = '0' + seconds;
-  }
-  return '' + date.getFullYear() + '-' + month + '-' + day + 'T' + hours + ':' + minutes + ':' + seconds;
 }
