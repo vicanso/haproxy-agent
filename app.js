@@ -42,7 +42,7 @@ function createHaproxyConfig(currentHaproxyCfgHash){
       let cfg = template({
         updatedAt : (new Date()).toISOString(),
         serverList : arr.join('\n'),
-        name : process.env.HOSTNAME || 'unknow'
+        name : process.env.HOSTNAME || 'unknown'
       });
       let result = fs.writeFileSync('/etc/haproxy/haproxy.cfg', cfg);
       if(!result){
