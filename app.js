@@ -30,6 +30,7 @@ function createHaproxyConfig(currentHaproxyCfgHash) {
   };
   co(function*() {
     let serverList = yield getServers();
+    console.info('serverList:%s', JSON.stringify(serverList));
     let hash = getHash(serverList);
     if (serverList.length && currentHaproxyCfgHash !== hash) {
       let arr = [];

@@ -1,9 +1,10 @@
 'use strict';
 const _ = require('lodash');
-var setting = {
-  consul : process.env.CONSUL || 'http://localhost:8500',
-  backendTag : process.env.BACKEND_TAG || 'varnish',
-  serviceTag : process.env.SERVICE_TAG || 'haproxy'
+const url = require('url');
+const setting = {
+  consul: url.parse(process.env.CONSUL || 'http://localhost:8500'),
+  backendTag: process.env.BACKEND_TAG || 'varnish',
+  serviceTag: process.env.SERVICE_TAG || 'haproxy'
 };
 
 exports.get = get;
